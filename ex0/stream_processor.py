@@ -118,17 +118,16 @@ class LogProcessor(DataProcessor):
         print(f'Processing data: "{data}"')
 
         try:
-            if data is None:
+            if data == "":
                 raise ValueError("Empty log")
-            if not isinstance(data, str):
+            if isinstance(data, str):
+                liste = data.split(":")
+                error_log = liste[0]
+                message_log = liste[1]
+                print("Validation: Text data verified")
+                return error_log, message_log
+            else:
                 raise ValueError("Wrong type")
-
-            liste = data.split(":")
-
-            error_log = liste[0]
-            message_log = liste[1]
-
-            return error_log, message_log
         except IndexError:
             return "Validation: Missing ':' separator in log"
         except ValueError as e:
@@ -144,7 +143,25 @@ class LogProcessor(DataProcessor):
         return validation
 
     def format_output(self, result) -> str:
-        pass
+        if isinstance(result, str):
+            return f'Output: {result}'
+
+        error_log, message_log = result
+        raw_data = f"{error_log}:{message_log}"
+
+        if not self.validate(raw_data):
+            return 'Output: Incorrect log'
+
+        error_message = ""
+        if error_log == "ERROR":
+            error_message = "[ALERT]"
+        elif error_log == "WARN":
+            error_message = "[WARN]"
+        elif error_log == "INFO":
+            error_message = "[INFO]"
+
+        return f'Output: {error_message} {error_log} \
+level detected: {message_log}'
 
 
 if __name__ == "__main__":
@@ -161,7 +178,6 @@ if __name__ == "__main__":
     # print(text_pro.validate(text))
     # print(text_pro.format_output(result_text))
     log_pro = LogProcessor()
-    log = ""
-    print(log_pro.process(log))
-    result_log = log_pro.validate(log)
+    log = "ERROR: Connection timeout"
+    result_log = log_pro.process(log)
     print(log_pro.format_output(result_log))
