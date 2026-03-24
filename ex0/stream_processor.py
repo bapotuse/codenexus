@@ -30,9 +30,9 @@ class NumericProcessor(DataProcessor):
             count = len(values)
             total = sum(values)
             avg = total / count
-            return (count, total, avg)
-        except (TypeError, ValueError) as e:
-            return f"{e}"
+            return f"Processed {count} numeric values, sum={total}, avg={avg}"
+        except (TypeError, ValueError):
+            return "All values aren't int"
 
     def validate(self, data: Any) -> bool:
         if not data:
@@ -48,11 +48,7 @@ class NumericProcessor(DataProcessor):
             return False
 
     def format_output(self, result) -> str:
-        if isinstance(result, str):
-            return f"Output: {result}"
-        count, total, avg = result
-        return f"Output: Processed {count} numeric values,\
- sum={total}, avg={avg}\n"
+        return f"Output: {result}"
 
 
 class TextProcessor(DataProcessor):
@@ -63,7 +59,8 @@ class TextProcessor(DataProcessor):
             if isinstance(data, str):
                 length_text = len(data)
                 count_words = len(data.split())
-                return length_text, count_words
+                return f"Processed text: {length_text} characters,\
+ {count_words} words"
             else:
                 raise ValueError("Wrong type")
         except TypeError:
@@ -72,18 +69,14 @@ class TextProcessor(DataProcessor):
             return f"{e}"
 
     def validate(self, data: Any) -> bool:
-        if not isinstance(data, str):
+        if not isinstance(data, str) or data == "":
             return False
         if data.replace('.', '', 1).isdigit():
             return False
         return True
 
     def format_output(self, result) -> str:
-        if isinstance(result, str):
-            return f"Output: {result}"
-        length_text, count_words = result
-        return f"Output: Processed text: {length_text} characters,\
- {count_words} words\n"
+        return f"Output: {result}"
 
 
 class LogProcessor(DataProcessor):
@@ -125,7 +118,10 @@ class LogProcessor(DataProcessor):
                 error_message = "[WARN]"
             elif result_split[0] == "INFO":
                 error_message = "[INFO]"
-            return f'Output: {error_message} {' '.join(result_split)}\n'
+            else:
+                return "Output: Missing alert message (ERROR, WARN or INFO)"
+            return f"Output: {error_message} {' '.join(result_split)}"
+        return f"Output: {result}"
 
 
 if __name__ == "__main__":
@@ -135,34 +131,39 @@ if __name__ == "__main__":
     values = [1, 2, 3, 4, 5]
     print(f'Processing Data: {values}')
     validation_nums = num_pro.validate(values)
+    result_nums = num_pro.process(values)
+
     if validation_nums:
         print("Validation: Numeric data verified")
-        result_nums = num_pro.process(values)
-        print(num_pro.format_output(result_nums))
     else:
-        print("Validation: Incorrect values\n")
+        print("Validation: Incorrect values")
+    print(num_pro.format_output(result_nums) + "\n")
+
     text_pro = TextProcessor()
     print("Initializing Text Processor...")
     text = "Hello Nexus World"
     print(f'Processing Data: {text}')
     validation_text = text_pro.validate(text)
+    result_text = text_pro.process(text)
+
     if validation_text:
         print("Validation: Text data verified")
-        result_text = text_pro.process(text)
-        print(text_pro.format_output(result_text))
     else:
-        print("Validation: Incorrect text\n")
+        print("Validation: Incorrect text")
+    print(text_pro.format_output(result_text) + "\n")
+
     log_pro = LogProcessor()
     print("Initializing Log Processor...")
-    log = "ERROR: Connection timeout"
+    log = "ERRR: Connection timeout"
     print(f'Processing data: "{log}"')
     validation_log = log_pro.validate(log)
+    result_log = log_pro.process(log)
+
     if validation_log:
         print("Validation: Log entry verified")
-        result_log = log_pro.process(log)
-        print(log_pro.format_output(result_log))
     else:
         print("Validation: Incorrect log")
+    print(log_pro.format_output(result_log) + "\n")
 
     print("=== POLYMORPHIC PROCESSING DEMO ===")
     print("Processing multiple data types through same interface...")
