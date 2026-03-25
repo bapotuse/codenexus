@@ -33,8 +33,9 @@ class SensorStream(DataStream):
             temp_element = ""
             for element in data_batch:
                 liste_element = element.split(":")
+                # A CONTINUER
                 if liste_element[0] in liste_valeurs:
-                    
+
         except IndexError:
             return "Missing ':' separator in log"
         except (ValueError, KeyError) as e:
