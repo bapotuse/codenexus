@@ -7,16 +7,17 @@ class DataStream(ABC):
     def process_batch(self, data_batch: List[Any]) -> str:
         pass
 
+    @abstractmethod
     def filter_data(self,
                     data_batch: List[Any],
                     criteria: Optional[str] = None) -> List[Any]:
         pass
 
     def get_stats(self) -> Dict[str, Union[str, int, float]]:
-        pass
+        return
 
 
-class StreamProcessor(DataStream):
+class StreamProcessor:
     pass
 
 
@@ -49,26 +50,7 @@ class SensorStream(DataStream):
                 raise ValueError('Incorrect type')
 
             if criteria == "" or criteria is None:
-                values = []
-                for element in data_batch:
-                    try:
-                        partie_element = element.split(":")
-                        if partie_element[0] not in liste_valeurs:
-                            raise ValueError("Incorrect Values (enter 'temp',\
- 'pressure' or 'humidity')")
-                        if partie_element[0] == "temp":
-                            values.append(float(partie_element[1]))
-                    except (IndexError, ValueError):
-                        raise ValueError("Incorrect Values (enter criteria:\
-value)")
-
-                if not values:
-                    return ["No temp readings found", ""]
-
-                count = len(values)
-                readings = "readings" if count > 1 else "reading"
-                avg = sum(values) / count
-                return [f'{count} {readings} processed', f'avg temp: {avg}°C']
+                criteria = "temp"
 
             if criteria not in liste_valeurs:
                 raise ValueError(f'"{criteria}" is incorrect, enter "temp",\
@@ -77,13 +59,21 @@ value)")
             values = []
             for element in data_batch:
                 try:
+                    if ":" not in element:
+                        raise ValueError(f'Missing ":" separator in\
+ "{element}"')
                     partie_element = element.split(":")
                     if partie_element[0] not in liste_valeurs:
-                        raise ValueError("Incorrect Values")
+                        raise ValueError(f'"{partie_element[0]}" \
+is not a valid key, enter "temp", "humidity" or "pressure"')
+                    if not partie_element[1].replace(".", "", 1).isdigit():
+                        raise ValueError(f'"{partie_element[1]}" \
+is not a valid value for "{partie_element[0]}", expected a number')
                     if partie_element[0] == criteria:
                         values.append(float(partie_element[1]))
                 except (IndexError, ValueError):
-                    raise ValueError("Incorrect Values")
+                    raise ValueError(f'Invalid format in "{element}",\
+ expected "key:value"')
 
             if not values:
                 return [f'No valid "{criteria}" readings found', ""]
@@ -92,8 +82,8 @@ value)")
             sign = "°C" if criteria == "temp" else ""
             readings = "readings" if count > 1 else "reading"
             avg = sum(values) / count
-            return [f'{count} {readings} processed', f'avg {criteria}:\
- {avg}{sign}']
+            return [f'{count} {readings} processed \
+avg {criteria}: {avg}{sign}']
 
         except (ValueError, TypeError) as e:
             return [f'{e}', ""]
@@ -252,10 +242,7 @@ if __name__ == "__main__":
     sensor_batch = ["temp:22.5", "humidity:65", "pressure:103"]
     print(f"Processing sensor batch: {sensor_batch}")
     sensor_result = sensor.filter_data(sensor_batch)
-    if len(sensor_result) >= 2:
-        print(f"Sensor analysis: {sensor_result[0]} {sensor_result[1]}")
-    else:
-        print(f"Sensor analysis: {sensor_result[0]}")
+    print(f"Sensor analysis: {sensor_result[0]}")
 
     print("\nInitializing Transaction Stream...")
     transaction = TransactionStream("TRANS_001")
@@ -275,4 +262,21 @@ Type: {event_stats['type']} ")
     event_batch = ["login", "error", "logout", "error"]
     print(f"Processing event batch: {event_batch}")
     event_result = event.filter_data(event_batch, "error")
-    print(f"Event analysis: {event_result[0]}")
+    print(f"Event analysis: {event_result[0]}\n")
+
+    processor = StreamProcessor()
+    print("=== Polymorphic Stream Processing ===")
+    print("Processing mixed stream types through unified interface...")
+    processor.add_stream(sensor)
+    processor.add_stream(transaction)
+    processor.add_stream(event)
+
+    batches = [
+        [
+            ["temp:22.5", "humidity:65"],                              # 2 readings  → Sensor data
+            ["buy:100", "sell:150", "buy:75", "sell:200"],             # 4 operations → Transaction data
+            ["click", "login", "logout"],            # 3 events    → Event data
+        ]
+    ]
+
+    processor.process_all(batches)
