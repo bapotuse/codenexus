@@ -44,37 +44,59 @@ class SensorStream(DataStream):
                     data_batch: List[Any],
                     criteria: Optional[str] = None) -> List[Any]:
         liste_valeurs = ["temp", "humidity", "pressure"]
-
         try:
             if not isinstance(data_batch, list):
                 raise ValueError('Incorrect type')
 
             if criteria == "" or criteria is None:
-                liste = []
+                values = []
                 for element in data_batch:
-                    partie_element = element.split(":")
-                    if partie_element[0] in liste_valeurs:
-                        liste.append(element)
-                    else:
-                        raise ValueError("Incorrect values")
-                return liste
+                    try:
+                        partie_element = element.split(":")
+                        if partie_element[0] not in liste_valeurs:
+                            raise ValueError("Incorrect Values (enter 'temp',\
+ 'pressure' or 'humidity')")
+                        if partie_element[0] == "temp":
+                            values.append(float(partie_element[1]))
+                    except (IndexError, ValueError):
+                        raise ValueError("Incorrect Values (enter criteria:\
+value)")
+
+                if not values:
+                    return ["No temp readings found", ""]
+
+                count = len(values)
+                readings = "readings" if count > 1 else "reading"
+                avg = sum(values) / count
+                return [f'{count} {readings} processed', f'avg temp: {avg}°C']
+
             if criteria not in liste_valeurs:
                 raise ValueError(f'"{criteria}" is incorrect, enter "temp",\
  "humidity" or "pressure"')
+
             values = []
             for element in data_batch:
-                partie_element = element.split(":")
-                if partie_element[0] == criteria:
-                    values.append(float(partie_element[1]))
-            count = len(data_batch)
+                try:
+                    partie_element = element.split(":")
+                    if partie_element[0] not in liste_valeurs:
+                        raise ValueError("Incorrect Values")
+                    if partie_element[0] == criteria:
+                        values.append(float(partie_element[1]))
+                except (IndexError, ValueError):
+                    raise ValueError("Incorrect Values")
+
+            if not values:
+                return [f'No valid "{criteria}" readings found', ""]
+
+            count = len(values)
             sign = "°C" if criteria == "temp" else ""
             readings = "readings" if count > 1 else "reading"
+            avg = sum(values) / count
             return [f'{count} {readings} processed', f'avg {criteria}:\
- {values[0]}{sign}']
-        except IndexError:
-            return ["Missing ':' separator in log"]
+ {avg}{sign}']
+
         except (ValueError, TypeError) as e:
-            return [f'{e}']
+            return [f'{e}', ""]
 
     def get_stats(self) -> Dict[str, Union[str, int, float]]:
         return {
@@ -110,25 +132,21 @@ class TransactionStream(DataStream):
         count = 0
         count_buy = 0.0
         count_sell = 0.0
-
         try:
             if not isinstance(data_batch, list):
                 raise ValueError('Incorrect type')
 
             if criteria == "" or criteria is None:
-                liste = []
-                for element in data_batch:
-                    partie_element = element.split(":")
-                    if partie_element[0] in liste_valeurs:
-                        liste.append(element)
-                    else:
-                        raise ValueError("Incorrect values")
-                return liste
+                criteria = "buy"
+
             if criteria not in liste_valeurs:
                 raise ValueError(f'"{criteria}" is incorrect, enter "buy"\
  or "sell"')
+
             for element in data_batch:
                 partie_element = element.split(":")
+                if partie_element[0] not in liste_valeurs:
+                    raise ValueError('Incorrect values, enter "buy" or "sell"')
                 try:
                     valeur = int(partie_element[1])
                 except ValueError:
@@ -145,13 +163,13 @@ class TransactionStream(DataStream):
                 result = f'buy {count_buy} units'
             elif criteria == "sell":
                 result = f'sell {count_sell} units'
-
             if count > 0:
                 count_units = f'+{count}'
             else:
                 count_units = count
-            return [f'{len(data_batch)} {operations} processed, \
-net flow: {count_units} units, {result}']
+            return [f'{len(data_batch)} {operations} processed, net flow:\
+ {count_units} units, {result}']
+
         except IndexError:
             return ["Missing ':' separator in log"]
         except (ValueError, TypeError) as e:
@@ -231,10 +249,13 @@ if __name__ == "__main__":
     sensor_stats = sensor.get_stats()
     print(f"Stream ID: {sensor_stats['stream_id']},\
  Type: {sensor_stats['type']}")
-    sensor_batch = ["temp:22.5", "humidity:65", "pressure:1013"]
+    sensor_batch = ["temp:22.5", "humidity:65", "pressure:103"]
     print(f"Processing sensor batch: {sensor_batch}")
-    result = sensor.filter_data(sensor_batch, "")
-    print(f"Sensor analysis: {result[0]}, {result[1]}")
+    sensor_result = sensor.filter_data(sensor_batch)
+    if len(sensor_result) >= 2:
+        print(f"Sensor analysis: {sensor_result[0]} {sensor_result[1]}")
+    else:
+        print(f"Sensor analysis: {sensor_result[0]}")
 
     print("\nInitializing Transaction Stream...")
     transaction = TransactionStream("TRANS_001")
@@ -243,7 +264,7 @@ if __name__ == "__main__":
 Type: {transaction_stats['type']} ")
     transaction_batch = ["buy:100", "sell:150", "buy:75"]
     print(f"Processing transaction batch: {transaction_batch}")
-    transaction_result = transaction.filter_data(transaction_batch, "buy")
+    transaction_result = transaction.filter_data(transaction_batch)
     print(f"Transaction analysis: {transaction_result[0]}")
 
     print("\nInitializing Event Stream...")
@@ -253,5 +274,5 @@ Type: {transaction_stats['type']} ")
 Type: {event_stats['type']} ")
     event_batch = ["login", "error", "logout", "error"]
     print(f"Processing event batch: {event_batch}")
-    event_result = event.filter_data(event_batch)
+    event_result = event.filter_data(event_batch, "error")
     print(f"Event analysis: {event_result[0]}")
